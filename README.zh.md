@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="./assets/readme/hero.svg" alt="dsh-vision：DeepSeek Harness 的原生视觉直通与文本模型视觉桥接" width="100%">
+  <img src="./assets/readme/hero.zh.svg" alt="dsh-vision：DeepSeek Harness 的原生视觉直通与文本模型视觉桥接" width="100%">
 </p>
 
 <p align="center">
@@ -32,30 +32,33 @@
 npx @deepseek-ai/dsh plugin --profile web add github:oil-oil/dsh-vision
 ```
 
-重启 Harness 后即可正常粘贴或拖入图片。插件会替换官方 `deepseek-official` 适配器，但继续使用原有模型列表、DeepSeek 设置和凭据。
+重启 Harness 后即可正常粘贴或拖入图片。插件会替换官方 `deepseek-official` 适配器，但继续使用原有模型列表、DeepSeek 设置和凭据，并在「设置 → 插件 → 插件配置」中新增「视觉识别」卡片。
 
 > DeepSeek Harness 仍处于 Developer Preview。当前版本固定兼容 `0.1.0-rc.6`。
 
-## 配置外部视觉模型
+## 配置视觉识别
 
-打开 Harness 的「设置 → 模型」，添加任意支持图片输入的模型并保存 API Key。插件直接使用 Harness 的官方模型与凭据系统，因此支持内置平台、OpenAI 兼容网关、OpenAI Responses、Anthropic Messages 及自定义服务。
+打开「设置 → 插件 → 插件配置 → 视觉识别」，选择 ZenMux、百炼、TokenDance 或 OpenRouter，然后填写对应的 API Key。同一张卡片还可以修改模型 ID、API 地址和单次图片上限。
 
-需要注意：自定义模型必须在模型能力中声明 `image` 输入，否则 Harness 会把它视为文本模型。
+API Key 通过 Harness 官方凭据服务保存。它在浏览器里是单向写入的：界面只能知道 Key 是否存在，不会把 Key 读回页面、聊天、普通设置或会话日志。
 
-路由规则很简单：明确指定的视觉模型是主路由；未指定时，Harness 中第一个已启用的视觉路由是主路由。只有主路由失败，插件才尝试其他已启用路由。ZenMux、百炼、TokenDance、OpenRouter 只是可选平台，不是固定的降级等级。API Key 只存入 Harness 凭据服务，不进入聊天、插件配置或会话日志。
+路由跟随用户选择：在「视觉识别」中选定的平台是文本模型的主视觉路由；Harness 中其他视觉模型、已有 see 配置和本地 OCR 只在失败后尝试。当前主模型本身支持图片时，原图始终直接进入当前模型，不经过这些桥接路由。
 
-## 指定视觉模型
+选择「自动选择」时不需要在插件里保存云端 Key。插件会依次尝试 Harness 中已配置且声明支持图片的模型、see 私有配置和本地 OCR。Harness 自定义模型必须声明 `image` 输入，否则仍会被视为文本模型。
 
-通常无需设置；只有配置了多个视觉模型并希望固定路由时，才在 `$DSH_HOME/settings.yaml` 中添加：
+## 高级文件配置
+
+通常直接使用界面即可。对应的非敏感字段位于 `$DSH_HOME/settings.yaml` 现有的 `llm-deepseek` 段落：
 
 ```yaml
-dsh-vision:
-  visionProvider: openai
-  visionModel: gpt-4.1
+llm-deepseek:
+  visionBackend: zenmux
+  visionBackendModel: qwen/qwen3.7-plus
+  visionBackendBaseURL: https://zenmux.ai/api/v1
   maxImages: 8
 ```
 
-`visionProvider` 和 `visionModel` 必须同时填写。修改设置后无需重启。
+不要把 API Key 写进这个文件。请在「视觉识别」卡片中保存，或使用对应环境变量。修改设置后无需重启。
 
 ## 兼容 see-skill 配置
 

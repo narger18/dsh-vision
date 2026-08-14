@@ -1,7 +1,7 @@
 import type { Context } from "@deepseek-ai/cordis"
 import { getOrCreateAnonymousUserId } from "@deepseek-ai/dsh-anonymous-user-id"
 import type {} from "@deepseek-ai/dsh-attachment"
-import type {} from "@deepseek-ai/dsh-credentials"
+import { credentialRef } from "@deepseek-ai/dsh-credentials"
 import { launchEnvironmentOf } from "@deepseek-ai/dsh-launch-environment"
 import { assertUsableApiKey, LlmError } from "@deepseek-ai/dsh-llm"
 import {
@@ -22,6 +22,10 @@ import {
   HarnessVisionAnalyzer,
   type VisionSelection,
 } from "./harness-vision.js"
+import {
+  VISION_PROVIDERS,
+  isVisionProviderName,
+} from "./provider-catalog.js"
 import { SeeCompatibleVisionAnalyzer } from "./vision.js"
 
 export const name = "dsh-vision"
@@ -29,10 +33,13 @@ export const inject = ["llm", "attachments"]
 
 const PROVIDER = "deepseek-official"
 const DEEPSEEK_NS = settingsNamespace("llm-deepseek")
-const VISION_NS = settingsNamespace("dsh-vision")
 
 export interface VisionConfig {
-  /** Pin one Harness vision route. Omit both fields for see-style failover. */
+  /** Provider managed by the Vision Recognition settings card. */
+  visionBackend?: string
+  visionBackendModel?: string
+  visionBackendBaseURL?: string
+  /** Pin one Harness vision route. Omit both fields for automatic routing. */
   visionProvider?: string
   visionModel?: string
   /** Optional compatibility with ~/.config/see/config.env. */
@@ -45,6 +52,9 @@ export interface VisionConfig {
 export interface Config extends DeepSeekConfig, VisionConfig {}
 
 export const VisionConfig: z<VisionConfig> = z.object({
+  visionBackend: z.string(),
+  visionBackendModel: z.string(),
+  visionBackendBaseURL: z.string(),
   visionProvider: z.string(),
   visionModel: z.string(),
   visionConfigFile: z.string(),
@@ -60,6 +70,9 @@ export const Config = z.intersect([
 
 function deepseekPart(config: Config): DeepSeekConfig {
   const {
+    visionBackend: _visionBackend,
+    visionBackendModel: _visionBackendModel,
+    visionBackendBaseURL: _visionBackendBaseURL,
     visionProvider: _visionProvider,
     visionModel: _visionModel,
     visionConfigFile: _visionConfigFile,
@@ -73,6 +86,15 @@ function deepseekPart(config: Config): DeepSeekConfig {
 
 function visionPart(config: Config): VisionConfig {
   return {
+    ...(config.visionBackend === undefined
+      ? {}
+      : { visionBackend: config.visionBackend }),
+    ...(config.visionBackendModel === undefined
+      ? {}
+      : { visionBackendModel: config.visionBackendModel }),
+    ...(config.visionBackendBaseURL === undefined
+      ? {}
+      : { visionBackendBaseURL: config.visionBackendBaseURL }),
     ...(config.visionProvider === undefined
       ? {}
       : { visionProvider: config.visionProvider }),
@@ -157,6 +179,29 @@ export function apply(ctx: Context, config: Config): void {
   const seeVision = new SeeCompatibleVisionAnalyzer({
     configFile: () => currentVision().visionConfigFile,
     timeoutMs: () => currentVision().visionTimeoutMs ?? 600000,
+    configuredProvider: async () => {
+      const current = currentVision()
+      if (!isVisionProviderName(current.visionBackend)) return undefined
+      const spec = VISION_PROVIDERS[current.visionBackend]
+      let apiKey: string | undefined
+      const credentials = ctx.get("credentials")
+      if (credentials !== undefined) {
+        for (const ref of spec.credentialRefs) {
+          const hit = await credentials.resolve(credentialRef(ref))
+          const value = hit?.value.trim()
+          if (value !== undefined && value !== "") {
+            apiKey = value
+            break
+          }
+        }
+      }
+      return {
+        name: current.visionBackend,
+        ...(apiKey === undefined ? {} : { apiKey }),
+        baseURL: current.visionBackendBaseURL?.trim() || spec.baseURL,
+        model: current.visionBackendModel?.trim() || spec.model,
+      }
+    },
   })
   const bridge = new VisionBridgeAdapter(
     deepseek,
@@ -166,6 +211,17 @@ export function apply(ctx: Context, config: Config): void {
     {
       maxImages: () => currentVision().maxImages ?? 8,
       cacheEntries: () => currentVision().cacheEntries ?? 64,
+      routingKey: () => {
+        const current = currentVision()
+        return JSON.stringify([
+          current.visionBackend,
+          current.visionBackendModel,
+          current.visionBackendBaseURL,
+          current.visionProvider,
+          current.visionModel,
+          current.visionConfigFile,
+        ])
+      },
     }
   )
 
@@ -187,28 +243,22 @@ export function apply(ctx: Context, config: Config): void {
   }
 
   const deepseekEntry = deepseekPart(config)
-  const visionEntry = visionPart(config)
   ctx.inject(["settings"], (settingsCtx) => {
-    const deepseekScope = settingsCtx.settings.register(
+    const scope = settingsCtx.settings.register(
       DEEPSEEK_NS,
-      DeepSeekConfigSchema,
-      { base: deepseekEntry }
+      Config,
+      { base: config }
     )
-    const visionScope = settingsCtx.settings.register(
-      VISION_NS,
-      VisionConfig,
-      { base: visionEntry }
-    )
-    currentDeepSeek = () => deepseekScope.get()
-    currentVision = () => visionScope.get()
+    currentDeepSeek = () => deepseekPart(scope.get())
+    currentVision = () => visionPart(scope.get())
     ensureRegistrationFacts()
-    deepseekScope.watch(ensureRegistrationFacts)
+    scope.watch(ensureRegistrationFacts)
     settingsCtx.effect(() => () => {
       // Cordis state 5/6 means the owner itself is unloading; route effects
       // are already being released and must not be refreshed from teardown.
       if (ctx.fiber.state >= 5) return
       currentDeepSeek = () => deepseekEntry
-      currentVision = () => visionEntry
+      currentVision = () => visionPart(config)
       ensureRegistrationFacts()
     })
   })

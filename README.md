@@ -32,30 +32,33 @@ Use the plugin manager built into DeepSeek Harness:
 npx @deepseek-ai/dsh plugin --profile web add github:oil-oil/dsh-vision
 ```
 
-Restart Harness, then paste or drag images into the composer as usual. The plugin replaces the official `deepseek-official` adapter while preserving its model catalog, settings, and credentials.
+Restart Harness, then paste or drag images into the composer as usual. The plugin replaces the official `deepseek-official` adapter while preserving its model catalog, settings, and credentials. It also adds a **Vision Recognition** card to **Settings → Plugins → Plugin configuration**.
 
 > DeepSeek Harness is still in Developer Preview. This release targets `0.1.0-rc.6` exactly.
 
-## Configure a vision model
+## Configure Vision Recognition
 
-Open **Settings → Models** in Harness, add any model that supports image input, and save its API key. The plugin reuses Harness's official model and credential systems, including built-in providers, OpenAI-compatible gateways, OpenAI Responses, Anthropic Messages, and custom services.
+Open **Settings → Plugins → Plugin configuration → Vision Recognition**. Select ZenMux, Alibaba Cloud Model Studio, TokenDance, or OpenRouter, then enter its API key. The same card lets you change the model ID, API endpoint, and image limit.
 
-A custom model must declare `image` as an input modality, or Harness will treat it as text-only.
+The API key is stored through Harness's official credential service. It is write-only in the browser: the plugin can report whether a key exists, but never reads it back into the page, chat, settings document, or session log.
 
-Routing is explicit: a pinned vision model is the primary route. Without a pin, the first enabled Harness vision route is primary. Other enabled routes are used only after the primary route fails. ZenMux, Alibaba Cloud Model Studio, TokenDance, and OpenRouter are optional providers, not a fixed fallback hierarchy. API keys stay in the Harness credential service and never enter chat messages, plugin settings, or session logs.
+Routing follows the user's choice. A provider selected in Vision Recognition is primary for text-only models. Other enabled Harness vision routes, an existing see configuration, and local OCR are failover only. When the current main model supports images, the original images pass through natively and none of these bridge routes are used.
 
-## Pin a vision model
+Choose **Automatic** to skip plugin-managed cloud credentials. The bridge then tries image-capable models already configured in Harness, followed by see-compatible private configuration and local OCR. A Harness custom model must declare `image` as an input modality or it remains a text model.
 
-Most setups do not need this. If several vision models are configured and one should always be primary, add this section to `$DSH_HOME/settings.yaml`:
+## Advanced file configuration
+
+Most setups should use the UI. The equivalent non-secret fields live in the existing `llm-deepseek` section of `$DSH_HOME/settings.yaml`:
 
 ```yaml
-dsh-vision:
-  visionProvider: openai
-  visionModel: gpt-4.1
+llm-deepseek:
+  visionBackend: zenmux
+  visionBackendModel: qwen/qwen3.7-plus
+  visionBackendBaseURL: https://zenmux.ai/api/v1
   maxImages: 8
 ```
 
-`visionProvider` and `visionModel` must be set together. Changes apply without a restart.
+Do not put API keys in this file. Save them in the Vision Recognition card or provide the matching environment variable. Changes apply without a restart.
 
 ## see-skill compatibility
 

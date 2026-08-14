@@ -1,6 +1,10 @@
 import type { StoredImageAttachment } from "@deepseek-ai/dsh-attachment"
 
-import { loadSeeProviders, type SeeProvider } from "./see-config.js"
+import {
+  loadSeeProviders,
+  type SeeProvider,
+  type SeeProviderName,
+} from "./see-config.js"
 import { analyzeLocally } from "./local-vision.js"
 
 interface VisionResponse {
@@ -25,6 +29,14 @@ export interface VisionAnalysis {
 export interface VisionAnalyzerOptions {
   readonly configFile?: string | (() => string | undefined)
   readonly timeoutMs: number | (() => number)
+  readonly configuredProvider?: () => Promise<ConfiguredVisionProvider | undefined>
+}
+
+export interface ConfiguredVisionProvider {
+  readonly name: SeeProviderName
+  readonly apiKey?: string
+  readonly baseURL: string
+  readonly model: string
 }
 
 function responseText(response: VisionResponse): string {
@@ -100,26 +112,35 @@ async function callProvider(
 export class SeeCompatibleVisionAnalyzer {
   readonly #configFile: string | (() => string | undefined) | undefined
   readonly #timeoutMs: number | (() => number)
+  readonly #configuredProvider:
+    | (() => Promise<ConfiguredVisionProvider | undefined>)
+    | undefined
 
   constructor(options: VisionAnalyzerOptions) {
     this.#configFile = options.configFile
     this.#timeoutMs = options.timeoutMs
+    this.#configuredProvider = options.configuredProvider
   }
 
-  async analyze(
+  #configFileValue(): string | undefined {
+    return typeof this.#configFile === "function"
+      ? this.#configFile()
+      : this.#configFile
+  }
+
+  #timeoutValue(): number {
+    return typeof this.#timeoutMs === "function"
+      ? this.#timeoutMs()
+      : this.#timeoutMs
+  }
+
+  async #analyzeProviders(
+    providers: readonly SeeProvider[],
     images: readonly StoredImageAttachment[],
     task: string,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    includeLocal = false
   ): Promise<VisionAnalysis> {
-    const configFile =
-      typeof this.#configFile === "function"
-        ? this.#configFile()
-        : this.#configFile
-    const timeoutMs =
-      typeof this.#timeoutMs === "function"
-        ? this.#timeoutMs()
-        : this.#timeoutMs
-    const providers = await loadSeeProviders(configFile)
     const failures: string[] = []
     for (const provider of providers) {
       try {
@@ -127,7 +148,7 @@ export class SeeCompatibleVisionAnalyzer {
           provider,
           images,
           task,
-          timeoutMs,
+          this.#timeoutValue(),
           signal
         )
         return { text, provider: provider.name, model: provider.model }
@@ -136,13 +157,58 @@ export class SeeCompatibleVisionAnalyzer {
         failures.push(error instanceof Error ? error.message : String(error))
       }
     }
-    try {
-      return await analyzeLocally(images)
-    } catch (localError) {
-      failures.push(
-        localError instanceof Error ? localError.message : String(localError)
-      )
+    if (includeLocal) {
+      try {
+        return await analyzeLocally(images)
+      } catch (localError) {
+        failures.push(
+          localError instanceof Error ? localError.message : String(localError)
+        )
+      }
     }
     throw new Error(`所有视觉服务均失败：${failures.join("；")}`)
+  }
+
+  /** Try only the provider explicitly selected in the plugin settings. */
+  async analyzeConfigured(
+    images: readonly StoredImageAttachment[],
+    task: string,
+    signal?: AbortSignal
+  ): Promise<VisionAnalysis> {
+    const configured = await this.#configuredProvider?.()
+    if (configured === undefined) {
+      throw new Error("视觉识别插件未指定外部平台")
+    }
+    const stored = await loadSeeProviders(this.#configFileValue())
+    const matching = stored.find((provider) => provider.name === configured.name)
+    const apiKey = configured.apiKey?.trim() || matching?.apiKey
+    if (apiKey === undefined || apiKey === "") {
+      throw new Error(`${configured.name} 尚未配置 API Key`)
+    }
+    return this.#analyzeProviders(
+      [{ ...configured, apiKey }],
+      images,
+      task,
+      signal
+    )
+  }
+
+  /** Try see-compatible providers not already selected, then local OCR. */
+  async analyze(
+    images: readonly StoredImageAttachment[],
+    task: string,
+    signal?: AbortSignal
+  ): Promise<VisionAnalysis> {
+    const configured = await this.#configuredProvider?.()
+    const providers = await loadSeeProviders(this.#configFileValue())
+    return this.#analyzeProviders(
+      configured === undefined
+        ? providers
+        : providers.filter((provider) => provider.name !== configured.name),
+      images,
+      task,
+      signal,
+      true
+    )
   }
 }

@@ -3,6 +3,46 @@ import { Config as Config$1, DeepSeekAdapter } from "@deepseek-ai/dsh-llm-deepse
 import z from "@deepseek-ai/schemastery";
 import { Context } from "@deepseek-ai/cordis";
 import { AttachmentStore, ImageAttachmentRef, StoredImageAttachment } from "@deepseek-ai/dsh-attachment";
+//#region src/provider-catalog.d.ts
+/** Provider defaults kept in sync with oil-oil/see-skill. */
+declare const VISION_PROVIDERS: {
+  readonly zenmux: {
+    readonly displayName: "ZenMux";
+    readonly baseURL: "https://zenmux.ai/api/v1";
+    readonly model: "qwen/qwen3.7-plus";
+    readonly credentialRefs: readonly ["ZENMUX_API_KEY"];
+  };
+  readonly bailian: {
+    readonly displayName: "百炼";
+    readonly baseURL: "https://dashscope.aliyuncs.com/compatible-mode/v1";
+    readonly model: "qwen3.7-plus";
+    readonly credentialRefs: readonly ["DASHSCOPE_API_KEY", "BAILIAN_API_KEY"];
+  };
+  readonly tokendance: {
+    readonly displayName: "TokenDance";
+    readonly baseURL: "https://tokendance.space/gateway/v1";
+    readonly model: "qwen3.7-plus";
+    readonly credentialRefs: readonly ["TOKENDANCE_API_KEY"];
+  };
+  readonly openrouter: {
+    readonly displayName: "OpenRouter";
+    readonly baseURL: "https://openrouter.ai/api/v1";
+    readonly model: "qwen/qwen3.7-plus";
+    readonly credentialRefs: readonly ["OPENROUTER_API_KEY"];
+  };
+};
+type VisionProviderName = keyof typeof VISION_PROVIDERS;
+//#endregion
+//#region src/see-config.d.ts
+type SeeProviderName = VisionProviderName;
+interface SeeProvider {
+  readonly name: SeeProviderName;
+  readonly apiKey: string;
+  readonly baseURL: string;
+  readonly model: string;
+}
+declare function loadSeeProviders(configFile?: string): Promise<SeeProvider[]>;
+//#endregion
 //#region src/vision.d.ts
 interface VisionAnalysis {
   readonly text: string;
@@ -12,10 +52,20 @@ interface VisionAnalysis {
 interface VisionAnalyzerOptions {
   readonly configFile?: string | (() => string | undefined);
   readonly timeoutMs: number | (() => number);
+  readonly configuredProvider?: () => Promise<ConfiguredVisionProvider | undefined>;
+}
+interface ConfiguredVisionProvider {
+  readonly name: SeeProviderName;
+  readonly apiKey?: string;
+  readonly baseURL: string;
+  readonly model: string;
 }
 declare class SeeCompatibleVisionAnalyzer {
   #private;
   constructor(options: VisionAnalyzerOptions);
+  /** Try only the provider explicitly selected in the plugin settings. */
+  analyzeConfigured(images: readonly StoredImageAttachment[], task: string, signal?: AbortSignal): Promise<VisionAnalysis>;
+  /** Try see-compatible providers not already selected, then local OCR. */
   analyze(images: readonly StoredImageAttachment[], task: string, signal?: AbortSignal): Promise<VisionAnalysis>;
 }
 //#endregion
@@ -38,6 +88,7 @@ declare class HarnessVisionAnalyzer {
 interface VisionBridgeOptions {
   readonly maxImages: () => number;
   readonly cacheEntries: () => number;
+  readonly routingKey: () => string;
 }
 declare class VisionBridgeAdapter extends LlmAdapter {
   #private;
@@ -53,51 +104,15 @@ declare class VisionBridgeAdapter extends LlmAdapter {
 /** Image-only fallback modeled after see-skill's system Vision → Tesseract path. */
 declare function analyzeLocally(images: readonly StoredImageAttachment[]): Promise<VisionAnalysis>;
 //#endregion
-//#region src/see-config.d.ts
-declare const PROVIDERS: {
-  zenmux: {
-    baseURL: string;
-    baseEnv: string;
-    keyNames: string[];
-    model: string;
-    modelEnv: string;
-  };
-  bailian: {
-    baseURL: string;
-    baseEnv: string;
-    keyNames: string[];
-    model: string;
-    modelEnv: string;
-  };
-  tokendance: {
-    baseURL: string;
-    baseEnv: string;
-    keyNames: string[];
-    model: string;
-    modelEnv: string;
-  };
-  openrouter: {
-    baseURL: string;
-    baseEnv: string;
-    keyNames: string[];
-    model: string;
-    modelEnv: string;
-  };
-};
-type SeeProviderName = keyof typeof PROVIDERS;
-interface SeeProvider {
-  readonly name: SeeProviderName;
-  readonly apiKey: string;
-  readonly baseURL: string;
-  readonly model: string;
-}
-declare function loadSeeProviders(configFile?: string): Promise<SeeProvider[]>;
-//#endregion
 //#region src/index.d.ts
 declare const name = "dsh-vision";
 declare const inject: string[];
 interface VisionConfig {
-  /** Pin one Harness vision route. Omit both fields for see-style failover. */
+  /** Provider managed by the Vision Recognition settings card. */
+  visionBackend?: string;
+  visionBackendModel?: string;
+  visionBackendBaseURL?: string;
+  /** Pin one Harness vision route. Omit both fields for automatic routing. */
   visionProvider?: string;
   visionModel?: string;
   /** Optional compatibility with ~/.config/see/config.env. */

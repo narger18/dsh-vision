@@ -23,6 +23,7 @@ import type { SeeCompatibleVisionAnalyzer, VisionAnalysis } from "./vision.js"
 export interface VisionBridgeOptions {
   readonly maxImages: () => number
   readonly cacheEntries: () => number
+  readonly routingKey: () => string
 }
 
 const IMAGE_INPUT = ["text", "image"] as const
@@ -41,6 +42,7 @@ export class VisionBridgeAdapter extends LlmAdapter {
   readonly #vision: SeeCompatibleVisionAnalyzer
   readonly #maxImages: () => number
   readonly #cacheEntries: () => number
+  readonly #routingKey: () => string
   readonly #cache = new Map<string, Promise<VisionAnalysis>>()
 
   constructor(
@@ -57,6 +59,7 @@ export class VisionBridgeAdapter extends LlmAdapter {
     this.#vision = vision
     this.#maxImages = options.maxImages
     this.#cacheEntries = options.cacheEntries
+    this.#routingKey = options.routingKey
   }
 
   providerInfo(provider: string): LlmProviderInfo {
@@ -104,36 +107,46 @@ export class VisionBridgeAdapter extends LlmAdapter {
     }
 
     const task = latestUserTask(options.messages, refs.length)
-    const key = `${refs.map((ref) => String(ref.attachmentId)).join(",")}\u0000${task}`
+    const key = [
+      this.#routingKey(),
+      refs.map((ref) => String(ref.attachmentId)).join(","),
+      task,
+    ].join("\u0000")
     let pending = this.#cache.get(key)
     if (pending === undefined) {
-      pending = this.#harnessVision
-        .analyze(refs, task, options.signal)
-        .catch(async (harnessError: unknown) => {
+      pending = Promise.all(
+        refs.map((ref) => this.#attachments.readImage(ref, options.signal))
+      ).then(async (images) => {
+        try {
+          return await this.#vision.analyzeConfigured(
+            images,
+            task,
+            options.signal
+          )
+        } catch (configuredError) {
           try {
-            const images = await Promise.all(
-              refs.map((ref) => this.#attachments.readImage(ref, options.signal))
-            )
-            return await this.#vision.analyze(images, task, options.signal)
-          } catch (seeError) {
-            const harnessMessage =
-              harnessError instanceof Error
-                ? harnessError.message
-                : String(harnessError)
-            const seeMessage =
-              seeError instanceof Error ? seeError.message : String(seeError)
-            throw new LlmError(
-              [
-                "没有可用的视觉后端。",
-                `Harness 模型：${harnessMessage}`,
-                `see 兼容配置：${seeMessage}`,
-                "请在设置 → 模型中添加支持图片输入的模型并保存 API Key。",
-              ].join(" "),
-              "MISSING_VISION_MODEL",
-              { cause: seeError }
-            )
+            return await this.#harnessVision.analyze(refs, task, options.signal)
+          } catch (harnessError) {
+            try {
+              return await this.#vision.analyze(images, task, options.signal)
+            } catch (fallbackError) {
+              const message = (error: unknown): string =>
+                error instanceof Error ? error.message : String(error)
+              throw new LlmError(
+                [
+                  "没有可用的视觉后端。",
+                  `插件平台：${message(configuredError)}`,
+                  `Harness 模型：${message(harnessError)}`,
+                  `see 与本地降级：${message(fallbackError)}`,
+                  "请在设置 → 插件 → 视觉识别中选择平台并保存 API Key。",
+                ].join(" "),
+                "MISSING_VISION_MODEL",
+                { cause: fallbackError }
+              )
+            }
           }
-        })
+        }
+      })
       this.#cache.set(key, pending)
       if (this.#cache.size > this.#cacheEntries()) {
         const oldest = this.#cache.keys().next().value
