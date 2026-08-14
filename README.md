@@ -1,5 +1,9 @@
 <p align="center">
-  <img src="./assets/readme/hero.svg" alt="dsh-vision：DeepSeek Harness 的原生视觉直通与文本模型视觉桥接" width="100%">
+  <img src="./assets/readme/hero.svg" alt="dsh-vision: native vision passthrough and a vision bridge for DeepSeek Harness" width="100%">
+</p>
+
+<p align="center">
+  English | <a href="./README.zh.md">中文</a>
 </p>
 
 <p align="center">
@@ -8,39 +12,41 @@
   <img alt="DeepSeek Harness" src="https://img.shields.io/badge/DeepSeek%20Harness-0.1.0--rc.6-4D6BFE?style=flat-square">
 </p>
 
-`dsh-vision` 是一个 DeepSeek Harness 插件。它让支持图片的模型继续使用原生视觉；当主模型只有文本能力时，自动调用外部视觉模型观察原图，再由原来的 DeepSeek 模型完成回答。
+`dsh-vision` is a plugin for DeepSeek Harness. Vision-capable models keep receiving images natively. When the selected main model is text-only, the plugin asks a separate vision model to observe the original images, then lets the original DeepSeek model produce the final answer.
 
-## 它怎么工作
+## How it works
 
-| 当前主模型 | 图片处理方式 | 最终回答者 |
+| Main model | Image path | Final answer |
 | --- | --- | --- |
-| 支持图片 | 原图直接发送，不压缩、不预先 OCR | 当前模型 |
-| `deepseek-official` 等文本模型 | 外部视觉模型读取原图，观察结果作为非可信附件上下文注入 | DeepSeek |
-| 云端视觉不可用 | macOS Vision 或 Tesseract 本地降级 | DeepSeek |
+| Supports images | Original images are sent directly, without preprocessing or OCR | Current model |
+| `deepseek-official` or another text-only model | A configured vision model observes the original images; its output is injected as untrusted attachment context | DeepSeek |
+| Cloud vision unavailable | Falls back to macOS Vision or Tesseract | DeepSeek |
 
-插件不会替换右下角选择的主模型。多张聊天附件会进入同一次视觉请求，适合前后对比和组合证据；用户的问题会原样交给视觉模型，不套固定报告模板。
+The plugin does not replace the main model selected in Harness. Multiple image attachments are analyzed together, so comparisons and combined evidence work naturally. The user's task is forwarded unchanged instead of being wrapped in a fixed report template.
 
-## 安装
+## Install
+
+Use the plugin manager built into DeepSeek Harness:
 
 ```bash
-dsh plugin --profile web add github:oil-oil/dsh-vision
+npx @deepseek-ai/dsh plugin --profile web add github:oil-oil/dsh-vision
 ```
 
-重启 Harness 后即可正常粘贴或拖入图片。插件会替换官方 `deepseek-official` 适配器，但继续使用原有模型列表、DeepSeek 设置和凭据。
+Restart Harness, then paste or drag images into the composer as usual. The plugin replaces the official `deepseek-official` adapter while preserving its model catalog, settings, and credentials.
 
-> DeepSeek Harness 仍处于 Developer Preview。当前版本固定兼容 `0.1.0-rc.6`。
+> DeepSeek Harness is still in Developer Preview. This release targets `0.1.0-rc.6` exactly.
 
-## 配置外部视觉模型
+## Configure a vision model
 
-打开 Harness 的「设置 → 模型」，添加任意支持图片输入的模型并保存 API Key。插件直接使用 Harness 的官方模型与凭据系统，因此支持内置平台、OpenAI 兼容网关、OpenAI Responses、Anthropic Messages 及自定义服务。
+Open **Settings → Models** in Harness, add any model that supports image input, and save its API key. The plugin reuses Harness's official model and credential systems, including built-in providers, OpenAI-compatible gateways, OpenAI Responses, Anthropic Messages, and custom services.
 
-需要注意：自定义模型必须在模型能力中声明 `image` 输入，否则 Harness 会把它视为文本模型。
+A custom model must declare `image` as an input modality, or Harness will treat it as text-only.
 
-路由规则很简单：明确指定的视觉模型是主路由；未指定时，Harness 中第一个已启用的视觉路由是主路由。只有主路由失败，插件才尝试其他已启用路由。ZenMux、百炼、TokenDance、OpenRouter 只是可选平台，不是固定的降级等级。API Key 只存入 Harness 凭据服务，不进入聊天、插件配置或会话日志。
+Routing is explicit: a pinned vision model is the primary route. Without a pin, the first enabled Harness vision route is primary. Other enabled routes are used only after the primary route fails. ZenMux, Alibaba Cloud Model Studio, TokenDance, and OpenRouter are optional providers, not a fixed fallback hierarchy. API keys stay in the Harness credential service and never enter chat messages, plugin settings, or session logs.
 
-## 指定视觉模型
+## Pin a vision model
 
-通常无需设置；只有配置了多个视觉模型并希望固定路由时，才在 `$DSH_HOME/settings.yaml` 中添加：
+Most setups do not need this. If several vision models are configured and one should always be primary, add this section to `$DSH_HOME/settings.yaml`:
 
 ```yaml
 dsh-vision:
@@ -49,38 +55,38 @@ dsh-vision:
   maxImages: 8
 ```
 
-`visionProvider` 和 `visionModel` 必须同时填写。修改设置后无需重启。
+`visionProvider` and `visionModel` must be set together. Changes apply without a restart.
 
-## 兼容 see-skill 配置
+## see-skill compatibility
 
-如果 Harness 中没有可用视觉模型，插件还会读取现有的 `~/.config/see/config.env`，兼容 ZenMux、百炼、OpenRouter 和 TokenDance。环境变量优先于本地配置。
+If Harness has no usable vision model, the plugin also reads `~/.config/see/config.env`. It supports ZenMux, Alibaba Cloud Model Studio, OpenRouter, and TokenDance. Environment variables override the private config file.
 
 ```bash
 export SEE_PROVIDER=zenmux
-export ZENMUX_API_KEY=你的Key
+export ZENMUX_API_KEY=your-key
 ```
 
-`SEE_PROVIDER` 指定主平台；其他已填写 Key 的平台仅作为失败后的备用。没有指定时，只配置了哪个平台就使用哪个平台。
+`SEE_PROVIDER` selects the primary provider. Other providers with configured keys are failover routes only. If no provider is selected and only one is configured, that provider is used.
 
-没有云端 Key 或所有云端服务失败时，插件会尝试本地能力：
+When no cloud key is available, or every cloud route fails, the plugin tries local capabilities:
 
-- macOS：系统 Vision OCR，无需额外安装。
-- Linux / Windows：Tesseract；需要自行安装对应语言包。
+- macOS: built-in Vision OCR, with no extra dependency.
+- Linux / Windows: Tesseract with the required language data installed.
 
-本地降级以文字识别为主，不等同于多模态模型的完整语义理解。
+Local fallback is primarily OCR and is not equivalent to full multimodal understanding.
 
-## 安全边界
+## Security boundary
 
-- 原图只发送给用户配置的视觉服务。
-- 视觉结果会被标记为非可信观察数据，图片里的提示词不会获得系统权限。
-- 视觉上下文只参与当前模型请求，不改写历史消息。
-- API Key 通过 Harness 凭据服务或 see 的用户私有配置解析，不写入仓库。
+- Original images are sent only to vision services configured by the user.
+- Vision output is marked as untrusted observation data; instructions inside an image receive no system authority.
+- Generated vision context affects only the current model request and does not rewrite message history.
+- API keys are resolved through Harness credentials or the user's private see config and are never written to this repository.
 
-## 开发
+## Development
 
 ```bash
 pnpm install
 pnpm check
 ```
 
-项目以 MIT 许可证开源。云端路由、多图联合与本地降级行为参考同为 MIT 的 [oil-oil/see-skill](https://github.com/oil-oil/see-skill)。DeepSeek 图标来自 [deepseek-ai/deepseek-harness](https://github.com/deepseek-ai/deepseek-harness) 官方仓库。
+The project is available under the MIT License. Cloud routing, joint multi-image analysis, and local fallback behavior are based on the MIT-licensed [oil-oil/see-skill](https://github.com/oil-oil/see-skill). The DeepSeek icon comes from the official [deepseek-ai/deepseek-harness](https://github.com/deepseek-ai/deepseek-harness) repository.
