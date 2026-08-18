@@ -9,7 +9,7 @@
 <p align="center">
   <a href="https://github.com/oil-oil/dsh-vision/actions"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/oil-oil/dsh-vision/ci.yml?style=flat-square&label=CI"></a>
   <a href="./LICENSE"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-4D6BFE?style=flat-square"></a>
-  <img alt="DeepSeek Harness" src="https://img.shields.io/badge/DeepSeek%20Harness-0.1.0--rc.6-4D6BFE?style=flat-square">
+  <img alt="DeepSeek Harness" src="https://img.shields.io/badge/DeepSeek%20Harness-rc.6%20%7C%20rc.7-4D6BFE?style=flat-square">
 </p>
 
 `dsh-vision` is a plugin for DeepSeek Harness. Vision-capable models keep receiving images natively. When the selected main model is text-only, the plugin asks a separate vision model to observe the original images, then lets the original DeepSeek model produce the final answer.
@@ -34,7 +34,7 @@ npx @deepseek-ai/dsh plugin --profile web add github:oil-oil/dsh-vision
 
 Restart Harness, then paste or drag images into the composer as usual. The plugin replaces the official `deepseek-official` adapter while preserving its model catalog, settings, and credentials. It also adds a **Vision Recognition** card to **Settings → Plugins → Plugin configuration**.
 
-> DeepSeek Harness is still in Developer Preview. This release targets `0.1.0-rc.6` exactly.
+> DeepSeek Harness is still in Developer Preview. This release supports `0.1.0-rc.6` and `0.1.0-rc.7`; the settings card selects list or keyed registration from the runtime Slot contract.
 
 ## Configure Vision Recognition
 

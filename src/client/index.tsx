@@ -11,6 +11,10 @@ import {
   VISION_SETTINGS_NAMESPACE,
   type VisionSettings,
 } from "./settings.js"
+import {
+  registerSettingsPluginCard,
+  type CompatibleSettingsSlots,
+} from "./settingsSlot.js"
 import { SETTINGS_CSS, SETTINGS_STYLE_ID } from "./styles.js"
 
 declare module "@deepseek-ai/dsh-client-ui-slots" {
@@ -48,15 +52,17 @@ export function apply(ctx: ClientContext): void {
   })
 
   ctx.slots.inject("settings.plugin.item", () =>
-    ctx.slots.register(
+    registerSettingsPluginCard(
+      // rc.6 declares a list slot; rc.7 declares a namespace-keyed slot.
+      ctx.slots as unknown as CompatibleSettingsSlots,
+      VisionSettingsCard,
       {
-        name: "settings.plugin.item",
-        id: "dsh-vision",
-        order: 30,
+        namespace: VISION_SETTINGS_NAMESPACE,
+        legacyId: "dsh-vision",
+        legacyOrder: 30,
         locale: LOCALE_NAMESPACE,
         inject: () => ({ scope, api: connection.api }),
-      },
-      VisionSettingsCard
+      }
     )
   )
 }

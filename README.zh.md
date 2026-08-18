@@ -9,7 +9,7 @@
 <p align="center">
   <a href="https://github.com/oil-oil/dsh-vision/actions"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/oil-oil/dsh-vision/ci.yml?style=flat-square&label=CI"></a>
   <a href="./LICENSE"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-4D6BFE?style=flat-square"></a>
-  <img alt="DeepSeek Harness" src="https://img.shields.io/badge/DeepSeek%20Harness-0.1.0--rc.6-4D6BFE?style=flat-square">
+  <img alt="DeepSeek Harness" src="https://img.shields.io/badge/DeepSeek%20Harness-rc.6%20%7C%20rc.7-4D6BFE?style=flat-square">
 </p>
 
 `dsh-vision` 是一个 DeepSeek Harness 插件。它让支持图片的模型继续使用原生视觉；当主模型只有文本能力时，自动调用外部视觉模型观察原图，再由原来的 DeepSeek 模型完成回答。
@@ -34,7 +34,7 @@ npx @deepseek-ai/dsh plugin --profile web add github:oil-oil/dsh-vision
 
 重启 Harness 后即可正常粘贴或拖入图片。插件会替换官方 `deepseek-official` 适配器，但继续使用原有模型列表、DeepSeek 设置和凭据，并在「设置 → 插件 → 插件配置」中新增「视觉识别」卡片。
 
-> DeepSeek Harness 仍处于 Developer Preview。当前版本固定兼容 `0.1.0-rc.6`。
+> DeepSeek Harness 仍处于 Developer Preview。当前版本兼容 `0.1.0-rc.6` 和 `0.1.0-rc.7`；设置卡会根据运行时 Slot 契约选择 list 或 keyed 注册方式。
 
 ## 配置视觉识别
 
