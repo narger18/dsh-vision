@@ -34,7 +34,7 @@ npx @deepseek-ai/dsh plugin --profile web add github:oil-oil/dsh-vision
 
 重启 Harness 后即可正常粘贴或拖入图片。插件会替换官方 `deepseek-official` 适配器，但继续使用原有模型列表、DeepSeek 设置和凭据，并在「设置 → 插件 → 插件配置」中新增「视觉识别」卡片。
 
-> DeepSeek Harness 仍处于 Developer Preview。当前版本兼容 `0.1.0-rc.6` 和 `0.1.0-rc.7`；设置卡会根据运行时 Slot 契约选择 list 或 keyed 注册方式。
+> DeepSeek Harness 仍处于 Developer Preview。当前版本兼容 `0.1.0-rc.6` 和 `0.1.0-rc.7`；设置卡注册同时满足旧版 list Slot 和当前 keyed Slot，不依赖私有的运行时探测接口。
 
 ## 配置视觉识别
 

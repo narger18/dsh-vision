@@ -6,12 +6,9 @@ import {
   type CompatibleSettingsSlots,
 } from "../src/client/settingsSlot.js"
 
-function registerFor(kind: string): ReturnType<typeof vi.fn> {
+function registerWithPublicFacade(): ReturnType<typeof vi.fn> {
   const register = vi.fn(() => vi.fn())
-  const slots: CompatibleSettingsSlots = {
-    specDynamic: () => ({ kind }),
-    register,
-  }
+  const slots: CompatibleSettingsSlots = { register }
 
   registerSettingsPluginCard(slots, "card", {
     namespace: "llm-deepseek",
@@ -24,20 +21,20 @@ function registerFor(kind: string): ReturnType<typeof vi.fn> {
 }
 
 describe("settings.plugin.item compatibility", () => {
-  it("passes the real rc.7 keyed slot validation", () => {
+  function registerWithSlotCore(kind: "keyed" | "list"): SlotCore {
     const slots = new SlotCore()
     const component = () => null
-    const releaseOwner = slots.register(
+    slots.register(
       {
         name: "root",
         children: {
-          "settings.plugin.item": { kind: "keyed", scope: "root" },
+          "settings.plugin.item": { kind, scope: "root" },
         },
       } as never,
       component as never
     )
 
-    const releaseCard = registerSettingsPluginCard(
+    registerSettingsPluginCard(
       slots as unknown as CompatibleSettingsSlots,
       component,
       {
@@ -48,52 +45,34 @@ describe("settings.plugin.item compatibility", () => {
         inject: () => ({}),
       }
     )
+    return slots
+  }
+
+  it("passes the rc.7 keyed slot validation", () => {
+    const slots = registerWithSlotCore("keyed")
 
     expect(slots.entries("settings.plugin.item")[0]?.options.key)
       .toBe("llm-deepseek")
-    releaseCard()
-    releaseOwner()
   })
 
-  it("uses the settings namespace as the rc.7 keyed slot key", () => {
-    const register = registerFor("keyed")
+  it("passes the rc.6 list slot validation", () => {
+    const slots = registerWithSlotCore("list")
+
+    expect(slots.entries("settings.plugin.item")[0]?.options.id)
+      .toBe("dsh-vision")
+  })
+
+  it("uses only the public register facade", () => {
+    const register = registerWithPublicFacade()
 
     expect(register).toHaveBeenCalledWith(
       expect.objectContaining({
         name: "settings.plugin.item",
         key: "llm-deepseek",
-      }),
-      "card"
-    )
-    expect(register.mock.calls[0]?.[0]).not.toHaveProperty("id")
-  })
-
-  it("keeps the rc.6 list slot registration", () => {
-    const register = registerFor("list")
-
-    expect(register).toHaveBeenCalledWith(
-      expect.objectContaining({
-        name: "settings.plugin.item",
         id: "dsh-vision",
         order: 30,
       }),
       "card"
     )
-    expect(register.mock.calls[0]?.[0]).not.toHaveProperty("key")
-  })
-
-  it("fails clearly for an unknown slot contract", () => {
-    const slots: CompatibleSettingsSlots = {
-      specDynamic: () => ({ kind: "single" }),
-      register: vi.fn(),
-    }
-
-    expect(() => registerSettingsPluginCard(slots, "card", {
-      namespace: "llm-deepseek",
-      legacyId: "dsh-vision",
-      legacyOrder: 30,
-      locale: "settings.dshVision",
-      inject: () => ({}),
-    })).toThrow("unsupported settings.plugin.item slot kind")
   })
 })

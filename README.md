@@ -34,7 +34,7 @@ npx @deepseek-ai/dsh plugin --profile web add github:oil-oil/dsh-vision
 
 Restart Harness, then paste or drag images into the composer as usual. The plugin replaces the official `deepseek-official` adapter while preserving its model catalog, settings, and credentials. It also adds a **Vision Recognition** card to **Settings → Plugins → Plugin configuration**.
 
-> DeepSeek Harness is still in Developer Preview. This release supports `0.1.0-rc.6` and `0.1.0-rc.7`; the settings card selects list or keyed registration from the runtime Slot contract.
+> DeepSeek Harness is still in Developer Preview. This release supports `0.1.0-rc.6` and `0.1.0-rc.7`; its settings-card registration satisfies both the legacy list Slot and the current keyed Slot without relying on private runtime inspection.
 
 ## Configure Vision Recognition
 
