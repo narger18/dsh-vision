@@ -1,0 +1,89 @@
+# Mixed Mode — settings.yaml Snippets
+
+## Minimal mixed mode (vision + image generation)
+```yaml
+llm-deepseek:
+  visionBackend: openrouter
+  imageGenerationEnabled: true
+  imageGenerationProvider: openai
+  imageGenerationModel: dall-e-3
+```
+
+## Full mixed mode (all features)
+```yaml
+llm-deepseek:
+  visionBackend: openrouter
+  visionBackendModel: qwen/qwen3.7-plus
+  presetVisionProviders:
+    - openai
+    - anthropic
+    - openrouter
+    - google
+  
+  imageGenerationEnabled: true
+  imageGenerationProvider: openai
+  imageGenerationModel: dall-e-3
+  maxImagesToGenerate: 2
+  
+  videoGenerationEnabled: true
+  videoGenerationProvider: runway
+  videoGenerationModel: gen-3
+  videoGenerationMaxAttempts: 90
+  videoGenerationPollIntervalMs: 8000
+```
+
+## Speed-optimized mixed mode
+```yaml
+llm-deepseek:
+  # Fast vision
+  visionBackend: google
+  visionBackendModel: gemini-2.0-flash-exp
+  visionTimeoutMs: 30000
+  
+  # Fast image generation
+  imageGenerationEnabled: true
+  imageGenerationProvider: openai
+  imageGenerationModel: dall-e-2
+  maxImagesToGenerate: 1
+  
+  # No video (disabled)
+  videoGenerationEnabled: false
+```
+
+## Quality-optimized mixed mode
+```yaml
+llm-deepseek:
+  # Best vision quality
+  visionBackend: anthropic
+  visionBackendModel: claude-sonnet-4-20250514
+  
+  # Best image quality
+  imageGenerationEnabled: true
+  imageGenerationProvider: openai
+  imageGenerationModel: dall-e-3
+  maxImagesToGenerate: 4
+  
+  # Best video quality
+  videoGenerationEnabled: true
+  videoGenerationProvider: runway
+  videoGenerationModel: gen-3
+```
+
+## With custom local vision fallback
+```yaml
+llm-deepseek:
+  customVisionProviders:
+    - name: ollama
+      displayName: Ollama Local
+      baseURL: http://localhost:11434/v1
+      model: llava:latest
+      credentialRefs: []
+  presetVisionProviders:
+    - ollama
+    - openrouter
+    - openai
+  
+  imageGenerationEnabled: true
+  imageGenerationProvider: openai
+  imageGenerationModel: dall-e-3
+```

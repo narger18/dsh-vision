@@ -1,0 +1,77 @@
+# Image Generation — settings.yaml Snippets
+
+## Agnes Image 2.1 Flash（免费，推荐）
+```yaml
+dsh-vision-image-gen:
+  provider: custom
+  model: agnes-image-2.1-flash
+  credentialName: "AGNES_AI_API_KEY"
+  baseURL: https://apihub.agnes-ai.com/v1/images/generations
+  enabled: true
+  maxImages: 4
+```
+
+## OpenAI DALL·E 3
+```yaml
+dsh-vision-image-gen:
+  provider: openai
+  model: dall-e-3
+  apiKeyRef: OPENAI_API_KEY
+  enabled: true
+```
+
+## OpenAI DALL·E 2（更快，更便宜）
+```yaml
+dsh-vision-image-gen:
+  provider: openai
+  model: dall-e-2
+  apiKeyRef: OPENAI_API_KEY
+  enabled: true
+```
+
+## Stability AI
+```yaml
+dsh-vision-image-gen:
+  provider: stability
+  model: stable-diffusion-xl-1024-v1-0
+  apiKeyRef: STABILITY_API_KEY
+  enabled: true
+```
+
+## 自定义图片生成端点
+在 UI 中选择 "Custom"，填写：
+- API Key
+- 模型名称
+- Base URL（如 `https://api.example.com/v1`）
+- 凭据名称
+
+## 多张图片生成
+```yaml
+dsh-vision-image-gen:
+  provider: openai
+  model: dall-e-3
+  apiKeyRef: OPENAI_API_KEY
+  enabled: true
+  maxImages: 4
+```
+
+## 与视觉桥接组合
+```yaml
+llm-deepseek:
+  visionBackend: openrouter
+  visionBackendModel: qwen/qwen3.7-plus
+
+dsh-vision-image-gen:
+  provider: custom
+  model: agnes-image-2.1-flash
+  credentialName: "AGNES_AI_API_KEY"
+  baseURL: https://apihub.agnes-ai.com/v1/images/generations
+  enabled: true
+```
+
+## Agnes Image 2.1 Flash 宽高比
+插件自动从提示词提取比例：
+- "生成图片：16:9 风景照" → 传 `ratio: "16:9"`
+- "生成图片：1:1 正方形头像" → 传 `ratio: "1:1"`
+
+支持：`1:1`、`3:4`、`4:3`、`16:9`、`9:16`、`2:3`、`3:2`、`21:9`

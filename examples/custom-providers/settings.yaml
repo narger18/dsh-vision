@@ -1,0 +1,73 @@
+# Custom Providers — settings.yaml Snippets
+
+## 视觉识别 — 自定义提供商（通过 UI 配置）
+在「视觉识别」卡片中选择 "Custom Key"，填写：
+- **API Key**：您的 API Key
+- **模型 ID**：默认视觉模型
+- **API 地址**：端点 URL（如 `https://api.example.com/v1`）
+- **凭据名称**：保存 Key 时使用的引用名（如 `VISION_API_KEY`）
+
+## Agnes AI 图片生成（免费）
+```yaml
+dsh-vision-image-gen:
+  provider: custom
+  model: agnes-image-2.1-flash
+  credentialName: "AGNES_AI_API_KEY"
+  baseURL: https://apihub.agnes-ai.com/v1/images/generations
+  enabled: true
+```
+
+## Agnes AI 视频生成（免费）
+```yaml
+dsh-vision-video-gen:
+  provider: custom
+  model: agnes-video-v2.0
+  credentialName: "AGNES_AI_API_KEY"
+  baseURL: https://apihub.agnes-ai.com/v1/videos
+  enabled: true
+```
+
+## OpenAI 图片生成
+```yaml
+dsh-vision-image-gen:
+  provider: openai
+  model: dall-e-3
+  apiKeyRef: OPENAI_API_KEY
+  enabled: true
+  maxImages: 4
+```
+
+## Runway 视频生成
+```yaml
+dsh-vision-video-gen:
+  provider: runway
+  model: gen-3
+  apiKeyRef: RUNWAY_API_KEY
+  enabled: true
+```
+
+## 完整配置示例
+```yaml
+# 视觉识别 — OpenRouter
+llm-deepseek:
+  visionBackend: openrouter
+  visionBackendModel: qwen/qwen3.7-plus
+  visionBackendBaseURL: https://openrouter.ai/api/v1
+  maxImages: 8
+
+# 图片生成 — Agnes AI（免费）
+dsh-vision-image-gen:
+  provider: custom
+  model: agnes-image-2.1-flash
+  credentialName: "AGNES_AI_API_KEY"
+  baseURL: https://apihub.agnes-ai.com/v1/images/generations
+  enabled: true
+
+# 视频生成 — Agnes AI（免费）
+dsh-vision-video-gen:
+  provider: custom
+  model: agnes-video-v2.0
+  credentialName: "AGNES_AI_API_KEY"
+  baseURL: https://apihub.agnes-ai.com/v1/videos
+  enabled: true
+```

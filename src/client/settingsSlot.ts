@@ -1,21 +1,18 @@
+import type { SlotCore } from "@deepseek-ai/dsh-client-ui-slots"
+
 export interface CompatibleSettingsSlots {
-  register: (
-    options: Record<string, unknown>,
-    component: unknown
-  ) => () => void
+  register: SlotCore["register"]
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function registerSettingsPluginCard(
   slots: CompatibleSettingsSlots,
-  component: unknown,
-  options: {
-    namespace: string
-    legacyId: string
-    legacyOrder: number
-    locale: string
-    inject: () => object
-  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  component: any,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  options: Record<string, any>
 ): () => void {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return slots.register(
     {
       name: "settings.plugin.item",
@@ -24,7 +21,7 @@ export function registerSettingsPluginCard(
       order: options.legacyOrder,
       locale: options.locale,
       inject: options.inject,
-    },
+    } as any,
     component
   )
 }

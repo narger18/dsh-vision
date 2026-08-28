@@ -1,0 +1,31 @@
+# Video Generation — settings.yaml Snippets
+
+## Agnes Video V2.0（免费，推荐）
+```yaml
+dsh-vision-video-gen:
+  provider: custom
+  model: agnes-video-v2.0
+  credentialName: "AGNES_AI_API_KEY"
+  baseURL: https://apihub.agnes-ai.com/v1/videos
+  enabled: true
+```
+
+## Runway Gen-3
+```yaml
+dsh-vision-video-gen:
+  provider: runway
+  model: gen-3
+  apiKeyRef: RUNWAY_API_KEY
+  enabled: true
+```
+
+## Pika 1.0
+```yaml
+dsh-vision-video-gen:
+  provider: pika
+  model: pika-1.0
+  apiKeyRef: PIKA_API_KEY
+  enabled: true
+```
+
+> **注意**：视频生成是异步操作，插件会自动轮询结果（最长等待 5 分钟）。

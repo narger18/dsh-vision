@@ -6,6 +6,12 @@ import {
   VISION_PROVIDERS,
   type VisionProviderName,
 } from "./provider-catalog.js"
+import {
+  loadCustomProviders,
+  mergeProvidersWithCustom,
+  findProviderSpec,
+  type CustomVisionProvider,
+} from "./provider-registry.js"
 
 interface ProviderEnvironment {
   readonly baseEnv: string
@@ -29,9 +35,25 @@ const PROVIDER_ENVIRONMENT = {
     baseEnv: "OPENROUTER_BASE_URL",
     modelEnv: "OPENROUTER_MODEL",
   },
+  anthropic: {
+    baseEnv: "ANTHROPIC_BASE_URL",
+    modelEnv: "ANTHROPIC_MODEL",
+  },
+  google: {
+    baseEnv: "GOOGLE_BASE_URL",
+    modelEnv: "GOOGLE_MODEL",
+  },
+  openai: {
+    baseEnv: "OPENAI_BASE_URL",
+    modelEnv: "OPENAI_MODEL",
+  },
+  custom: {
+    baseEnv: "CUSTOM_VISION_BASE_URL",
+    modelEnv: "CUSTOM_VISION_MODEL",
+  },
 } satisfies Record<VisionProviderName, ProviderEnvironment>
 
-export type SeeProviderName = VisionProviderName
+export type SeeProviderName = VisionProviderName | string
 
 export interface SeeProvider {
   readonly name: SeeProviderName
@@ -40,12 +62,112 @@ export interface SeeProvider {
   readonly model: string
 }
 
-const DEFAULT_ORDER: readonly SeeProviderName[] = [
-  "zenmux",
-  "bailian",
-  "tokendance",
-  "openrouter",
-]
+function buildProviderOrder(
+  values: ReadonlyMap<string, string>,
+  customProviders: readonly CustomVisionProvider[]
+): SeeProviderName[] {
+  const builtInNames = new Set(Object.keys(VISION_PROVIDERS))
+  const customNames = new Set(customProviders.map((p) => p.name))
+  const allKnown = new Set([...builtInNames, ...customNames])
+
+  const presetNames = (values.get("SEE_PROVIDER_ORDER") ?? "").split(",").map((s) => s.trim().toLowerCase())
+  const explicitPreset = values.get("SEE_PROVIDER")?.trim().toLowerCase()
+
+  const ordered = new Map<string, number>()
+  let idx = 0
+  if (explicitPreset && allKnown.has(explicitPreset)) {
+    ordered.set(explicitPreset, idx++)
+  }
+  for (const name of presetNames) {
+    if (!ordered.has(name) && allKnown.has(name)) {
+      ordered.set(name, idx++)
+    }
+  }
+  // Append any remaining known providers in a stable order
+  for (const name of [...builtInNames, ...customProviders.map((p) => p.name)]) {
+    if (!ordered.has(name)) {
+      ordered.set(name, idx++)
+    }
+  }
+  return [...ordered.keys()] as SeeProviderName[]
+}
+
+export async function loadSeeProviders(
+  configFile?: string,
+  customProviders?: readonly CustomVisionProvider[]
+): Promise<SeeProvider[]> {
+  const path = resolve(
+    configFile ??
+      process.env.SEE_CONFIG_FILE ??
+      `${homedir()}/.config/see/config.env`
+  )
+  let stored = ""
+  try {
+    stored = await readFile(path, "utf8")
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code
+    if (code !== "ENOENT") throw error
+  }
+  const values = parseEnv(stored)
+  const preferred = (values.get("SEE_PROVIDER") ?? "").toLowerCase()
+  const providers: SeeProvider[] = []
+
+  const mergedCustom = customProviders ?? loadCustomProviders([])
+  const order = buildProviderOrder(values, mergedCustom)
+
+  for (const name of order) {
+    const customEntry = mergedCustom.find((p) => p.name === name)
+    let builtInSpec: typeof VISION_PROVIDERS[keyof typeof VISION_PROVIDERS] | undefined
+    if (name !== "custom") {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      builtInSpec = (VISION_PROVIDERS as Record<string, typeof VISION_PROVIDERS[keyof typeof VISION_PROVIDERS]>)[name]
+    }
+    const spec = builtInSpec ?? customEntry
+
+    if (spec === undefined) continue
+
+    let environment: ProviderEnvironment | undefined
+    if (name !== "custom") {
+      environment = PROVIDER_ENVIRONMENT[name as VisionProviderName]
+    } else {
+      environment = PROVIDER_ENVIRONMENT.custom
+    }
+    const providerKey = spec.credentialRefs
+      .map((keyName: string) => value(keyName, values))
+      .find((candidate: string) => candidate !== "")
+    const apiKey =
+      providerKey ?? (preferred === name ? value("SEE_API_KEY", values) : "")
+    if (apiKey === "") continue
+    const useCommon = preferred === name
+    providers.push({
+      name,
+      apiKey,
+      baseURL: useCommon
+        ? value(
+            "SEE_BASE_URL",
+            values,
+            environment !== undefined
+              ? value(environment.baseEnv, values, spec.baseURL)
+              : spec.baseURL
+          )
+        : environment !== undefined
+          ? value(environment.baseEnv, values, spec.baseURL)
+          : spec.baseURL,
+      model: useCommon
+        ? value(
+            "SEE_MODEL",
+            values,
+            environment !== undefined
+              ? value(environment.modelEnv, values, spec.model)
+              : spec.model
+          )
+        : environment !== undefined
+          ? value(environment.modelEnv, values, spec.model)
+          : spec.model,
+    })
+  }
+  return providers
+}
 
 function parseEnv(text: string): Map<string, string> {
   const values = new Map<string, string>()
@@ -68,68 +190,4 @@ function value(
   fallback = ""
 ): string {
   return process.env[name]?.trim() || values.get(name)?.trim() || fallback
-}
-
-function providerOrder(values: ReadonlyMap<string, string>): SeeProviderName[] {
-  const preferred = value("SEE_PROVIDER", values).toLowerCase()
-  const configured = value("SEE_PROVIDER_ORDER", values)
-  const source = configured === "" ? DEFAULT_ORDER : configured.split(",")
-  const order = source
-    .map((item) => item.trim().toLowerCase())
-    .filter((item): item is SeeProviderName => item in VISION_PROVIDERS)
-  if (preferred in VISION_PROVIDERS) {
-    const first = preferred as SeeProviderName
-    return [first, ...order.filter((item) => item !== first)]
-  }
-  return order
-}
-
-export async function loadSeeProviders(
-  configFile?: string
-): Promise<SeeProvider[]> {
-  const path = resolve(
-    configFile ??
-      process.env.SEE_CONFIG_FILE ??
-      `${homedir()}/.config/see/config.env`
-  )
-  let stored = ""
-  try {
-    stored = await readFile(path, "utf8")
-  } catch (error) {
-    const code = (error as NodeJS.ErrnoException).code
-    if (code !== "ENOENT") throw error
-  }
-  const values = parseEnv(stored)
-  const preferred = value("SEE_PROVIDER", values).toLowerCase()
-  const providers: SeeProvider[] = []
-  for (const name of providerOrder(values)) {
-    const spec = VISION_PROVIDERS[name]
-    const environment = PROVIDER_ENVIRONMENT[name]
-    const providerKey = spec.credentialRefs
-      .map((keyName) => value(keyName, values))
-      .find((candidate) => candidate !== "")
-    const apiKey =
-      providerKey ?? (preferred === name ? value("SEE_API_KEY", values) : "")
-    if (apiKey === "") continue
-    const useCommon = preferred === name
-    providers.push({
-      name,
-      apiKey,
-      baseURL: useCommon
-        ? value(
-            "SEE_BASE_URL",
-            values,
-            value(environment.baseEnv, values, spec.baseURL)
-          )
-        : value(environment.baseEnv, values, spec.baseURL),
-      model: useCommon
-        ? value(
-            "SEE_MODEL",
-            values,
-            value(environment.modelEnv, values, spec.model)
-          )
-        : value(environment.modelEnv, values, spec.model),
-    })
-  }
-  return providers
 }

@@ -26,7 +26,7 @@ export default defineConfig([
     clean: true,
   },
   {
-    name: "@oil-oil/dsh-vision/client",
+    name: "@narger18/dsh-vision/client",
     entry: { client: "src/client/index.tsx" },
     outDir: "lib",
     format: "cjs",
@@ -44,7 +44,7 @@ export default defineConfig([
     },
     outputOptions: {
       entryFileNames: "client.js",
-      banner: "window.__ModuleLoader__.load({ id: \"@oil-oil/dsh-vision\", factory: (require) => {",
+      banner: "window.__ModuleLoader__.load({ id: \"@narger18/dsh-vision\", factory: (require) => {",
       footer: "return module.exports; } });",
       intro: "var module = { exports: {} }; var exports = module.exports;",
     },

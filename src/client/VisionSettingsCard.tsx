@@ -22,8 +22,8 @@ import {
 import type { VisionLocaleKey } from "./locales.js"
 import {
   VISION_SETTINGS_NAMESPACE,
-  draftForProvider,
   draftOf,
+  draftForProvider,
   sameDraft,
   settingsOps,
   validMaxImages,
@@ -52,7 +52,8 @@ type CredentialState =
 
 function credentialFacts(
   provider: VisionProviderName | undefined,
-  state: CredentialState
+  state: CredentialState,
+  draft?: VisionDraft
 ): {
   readonly configured: boolean
   readonly writable: boolean
@@ -61,8 +62,10 @@ function credentialFacts(
   if (provider === undefined) {
     return { configured: false, writable: false, primaryRef: undefined }
   }
-  const refs = VISION_PROVIDERS[provider].credentialRefs
-  const primaryRef = refs[0]
+  const refs = provider === "custom"
+    ? []
+    : VISION_PROVIDERS[provider]?.credentialRefs ?? []
+  const primaryRef = refs[0] ?? (provider === "custom" ? draft?.credentialName : undefined)
   if (primaryRef === undefined || state.kind !== "ready") {
     return { configured: false, writable: true, primaryRef }
   }
@@ -75,11 +78,21 @@ function credentialFacts(
 
 export function VisionSettingsCard(props: VisionSettingsCardProps): ReactNode {
   const { scope, api, t } = props
-  if (scope === undefined || api === undefined || t === undefined) return null
-  return <Loaded scope={scope} api={api} t={t} />
+  if (
+    scope === undefined ||
+    api === undefined ||
+    t === undefined
+  ) return null
+  return (
+    <Loaded scope={scope} api={api} t={t} />
+  )
 }
 
-function Loaded({ scope, api, t }: VisionSettingsCardInjected & {
+function Loaded({
+  scope,
+  api,
+  t,
+}: VisionSettingsCardInjected & {
   readonly t: (key: VisionLocaleKey) => string
 }): ReactNode {
   const snapshot = useSyncExternalStore(
@@ -105,7 +118,7 @@ function Loaded({ scope, api, t }: VisionSettingsCardInjected & {
   const maxImagesValid = validMaxImages(draft.maxImages)
   const providerValid = validProviderDraft(draft)
   const writable = snapshot.status === "ready" && snapshot.writable
-  const facts = credentialFacts(draft.provider, credential)
+  const facts = credentialFacts(draft.provider, credential, draft)
   const credentialPending =
     draft.provider !== undefined &&
     (credential.kind === "idle" || credential.kind === "loading")
@@ -137,7 +150,7 @@ function Loaded({ scope, api, t }: VisionSettingsCardInjected & {
     let active = true
     setCredential({ kind: "loading" })
     void api.credentials.describe({
-      refs: [...VISION_PROVIDERS[provider].credentialRefs],
+      refs: draft.provider === "custom" ? [] : [...VISION_PROVIDERS[draft.provider!].credentialRefs],
     }).then(
       (response) => {
         if (!active) return
@@ -275,139 +288,170 @@ function Loaded({ scope, api, t }: VisionSettingsCardInjected & {
               ? <p className="dsh-vision-settings-status">{t("readOnly")}</p>
               : null}
 
-            <div className="dsh-vision-settings-field">
-              <label className="dsh-vision-settings-label" htmlFor="dsh-vision-provider">
-                {t("provider")}
-              </label>
-              <select
-                id="dsh-vision-provider"
-                className="dsh-vision-settings-select"
-                value={draft.provider ?? ""}
-                disabled={disabled}
-                onChange={(event) => {
-                  const provider = isVisionProviderName(event.target.value)
-                    ? event.target.value
-                    : undefined
-                  setDraft((current) => draftForProvider(current, provider))
-                  setKeyDraft("")
-                  clearMessages()
-                }}
-              >
-                <option value="">{t("automatic")}</option>
-                {Object.entries(VISION_PROVIDERS).map(([id, provider]) => (
-                  <option key={id} value={id}>{provider.displayName}</option>
-                ))}
-              </select>
-              <p className="dsh-vision-settings-hint">
-                {t(draft.provider === undefined ? "automaticHint" : "configuredHint")}
-              </p>
-            </div>
 
-            {draft.provider === undefined
-              ? null
-              : (
+
+            <div className="dsh-vision-settings-body-main">
+              {snapshot.status === "ready" && (
                 <>
                   <div className="dsh-vision-settings-field">
-                    <div className="dsh-vision-settings-field-head">
-                      <label className="dsh-vision-settings-label" htmlFor="dsh-vision-api-key">
-                        {t("apiKey")}
-                      </label>
-                      <span
-                        className="dsh-vision-settings-badge"
-                        data-tone={facts.configured ? "success" : "muted"}
-                      >
-                        {credentialLabel}
-                      </span>
-                    </div>
-                    <Input
-                      id="dsh-vision-api-key"
-                      className="dsh-vision-settings-input"
-                      type="password"
-                      autoComplete="off"
-                      value={keyDraft}
-                      placeholder={t("keyPlaceholder")}
-                      disabled={disabled || !facts.writable}
-                      aria-invalid={keyRequired}
+                    <label className="dsh-vision-settings-label" htmlFor="dsh-vision-provider">
+                      {t("provider")}
+                    </label>
+                    <select
+                      id="dsh-vision-provider"
+                      className="dsh-vision-settings-select"
+                      value={draft.provider ?? ""}
+                      disabled={disabled}
                       onChange={(event) => {
-                        setKeyDraft(event.target.value)
+                        const provider = isVisionProviderName(event.target.value)
+                          ? event.target.value
+                          : undefined
+                        setDraft((current) => draftForProvider(current, provider))
+                        setKeyDraft("")
                         clearMessages()
                       }}
-                    />
-                    <p className={keyRequired ? "dsh-vision-settings-error" : "dsh-vision-settings-hint"}>
-                      {keyHint}
+                    >
+                      <option value="">{t("automatic")}</option>
+                      {Object.entries(VISION_PROVIDERS).map(([id, provider]) => (
+                        <option key={id} value={id}>{provider.displayName}</option>
+                      ))}
+                      <option key="custom" value="custom">{t("customKey")}</option>
+                    </select>
+                    <p className="dsh-vision-settings-hint">
+                      {t(draft.provider === undefined ? "automaticHint" : "configuredHint")}
                     </p>
                   </div>
 
-                  <div className="dsh-vision-settings-field">
-                    <label className="dsh-vision-settings-label" htmlFor="dsh-vision-model">
-                      {t("model")}
-                    </label>
-                    <Input
-                      id="dsh-vision-model"
-                      className="dsh-vision-settings-input"
-                      value={draft.model}
-                      disabled={disabled}
-                      aria-invalid={!providerValid}
-                      onChange={(event) => {
-                        setDraft((current) => ({ ...current, model: event.target.value }))
-                        clearMessages()
-                      }}
-                    />
-                    <p className="dsh-vision-settings-hint">{t("modelHint")}</p>
-                  </div>
+                    {/* API Key, Model, Base URL — always visible when provider is selected or custom */}
+                    {(draft.provider !== undefined) && (
+                      <>
+                        <div className="dsh-vision-settings-field">
+                          <div className="dsh-vision-settings-field-head">
+                            <label className="dsh-vision-settings-label" htmlFor="dsh-vision-api-key">
+                              {t("apiKey")}
+                            </label>
+                            <span
+                              className="dsh-vision-settings-badge"
+                              data-tone={facts.configured ? "success" : "muted"}
+                            >
+                              {credentialLabel}
+                            </span>
+                          </div>
+                          <Input
+                            id="dsh-vision-api-key"
+                            className="dsh-vision-settings-input"
+                            type="password"
+                            autoComplete="off"
+                            value={keyDraft}
+                            placeholder={t("keyPlaceholder")}
+                            disabled={disabled || !facts.writable}
+                            aria-invalid={keyRequired}
+                            onChange={(event) => {
+                              setKeyDraft(event.target.value)
+                              clearMessages()
+                            }}
+                          />
+                          <p className={keyRequired ? "dsh-vision-settings-error" : "dsh-vision-settings-hint"}>
+                            {keyHint}
+                          </p>
+                        </div>
+
+                        <div className="dsh-vision-settings-field">
+                          <label className="dsh-vision-settings-label" htmlFor="dsh-vision-model">
+                            {t("model")}
+                          </label>
+                          <Input
+                            id="dsh-vision-model"
+                            className="dsh-vision-settings-input"
+                            value={draft.model}
+                            disabled={disabled}
+                            aria-invalid={!providerValid}
+                            onChange={(event) => {
+                              setDraft((current) => ({ ...current, model: event.target.value }))
+                              clearMessages()
+                            }}
+                          />
+                          <p className="dsh-vision-settings-hint">{t("modelHint")}</p>
+                        </div>
+
+                        <div className="dsh-vision-settings-field">
+                          <label className="dsh-vision-settings-label" htmlFor="dsh-vision-base-url">
+                            {t("baseURL")}
+                          </label>
+                          <Input
+                            id="dsh-vision-base-url"
+                            className="dsh-vision-settings-input"
+                            type="url"
+                            value={draft.baseURL}
+                            disabled={disabled}
+                            aria-invalid={!providerValid}
+                            onChange={(event) => {
+                              setDraft((current) => ({ ...current, baseURL: event.target.value }))
+                              clearMessages()
+                            }}
+                          />
+                          <p className={providerValid ? "dsh-vision-settings-hint" : "dsh-vision-settings-error"}>
+                            {t(providerValid ? "baseURLHint" : "invalidProvider")}
+                          </p>
+                        </div>
+
+                        {draft.provider === "custom" && (
+                          <div className="dsh-vision-settings-field">
+                            <label className="dsh-vision-settings-label" htmlFor="dsh-vision-credential-name">
+                              {t("credentialName")}
+                            </label>
+                            <Input
+                              id="dsh-vision-credential-name"
+                              className="dsh-vision-settings-input"
+                              value={draft.credentialName}
+                              placeholder={t("credentialNamePlaceholder")}
+                              disabled={disabled}
+                              onChange={(event) => {
+                                setDraft((current) => ({ ...current, credentialName: event.target.value }))
+                                clearMessages()
+                              }}
+                            />
+                            <p className="dsh-vision-settings-hint">
+                              {t("credentialNameHint")}
+                            </p>
+                          </div>
+                        )}
+                      </>
+                    )}
 
                   <div className="dsh-vision-settings-field">
-                    <label className="dsh-vision-settings-label" htmlFor="dsh-vision-base-url">
-                      {t("baseURL")}
+                    <label className="dsh-vision-settings-label" htmlFor="dsh-vision-max-images">
+                      {t("maxImages")}
                     </label>
                     <Input
-                      id="dsh-vision-base-url"
-                      className="dsh-vision-settings-input"
-                      type="url"
-                      value={draft.baseURL}
+                      id="dsh-vision-max-images"
+                      className="dsh-vision-settings-number"
+                      type="number"
+                      inputMode="numeric"
+                      min={1}
+                      max={32}
+                      step={1}
+                      value={String(draft.maxImages)}
                       disabled={disabled}
-                      aria-invalid={!providerValid}
+                      aria-invalid={!maxImagesValid}
                       onChange={(event) => {
-                        setDraft((current) => ({ ...current, baseURL: event.target.value }))
+                        setDraft((current) => ({
+                          ...current,
+                          maxImages: Number(event.target.value),
+                        }))
                         clearMessages()
                       }}
                     />
-                    <p className={providerValid ? "dsh-vision-settings-hint" : "dsh-vision-settings-error"}>
-                      {t(providerValid ? "baseURLHint" : "invalidProvider")}
+                    <p className={maxImagesValid ? "dsh-vision-settings-hint" : "dsh-vision-settings-error"}>
+                      {t(maxImagesValid ? "maxImagesHint" : "invalidMaxImages")}
                     </p>
                   </div>
+
+                  <p className="dsh-vision-settings-failover">{t("failover")}</p>
                 </>
               )}
-
-            <div className="dsh-vision-settings-field">
-              <label className="dsh-vision-settings-label" htmlFor="dsh-vision-max-images">
-                {t("maxImages")}
-              </label>
-              <Input
-                id="dsh-vision-max-images"
-                className="dsh-vision-settings-number"
-                type="number"
-                inputMode="numeric"
-                min={1}
-                max={32}
-                step={1}
-                value={String(draft.maxImages)}
-                disabled={disabled}
-                aria-invalid={!maxImagesValid}
-                onChange={(event) => {
-                  setDraft((current) => ({
-                    ...current,
-                    maxImages: Number(event.target.value),
-                  }))
-                  clearMessages()
-                }}
-              />
-              <p className={maxImagesValid ? "dsh-vision-settings-hint" : "dsh-vision-settings-error"}>
-                {t(maxImagesValid ? "maxImagesHint" : "invalidMaxImages")}
-              </p>
             </div>
 
-            <p className="dsh-vision-settings-failover">{t("failover")}</p>
             <div className="dsh-vision-settings-footer">
               <p
                 className="dsh-vision-settings-footer-status"
@@ -442,3 +486,5 @@ function Loaded({ scope, api, t }: VisionSettingsCardInjected & {
     </li>
   )
 }
+
+

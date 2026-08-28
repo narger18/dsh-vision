@@ -31,12 +31,30 @@ export const VISION_PROVIDERS = {
     model: "qwen/qwen3.7-plus",
     credentialRefs: ["OPENROUTER_API_KEY"],
   },
+  anthropic: {
+    displayName: "Anthropic (Claude)",
+    baseURL: "https://api.anthropic.com/v1",
+    model: "claude-sonnet-4-20250514",
+    credentialRefs: ["ANTHROPIC_API_KEY"],
+  },
+  google: {
+    displayName: "Google (Gemini)",
+    baseURL: "https://generativelanguage.googleapis.com/v1beta",
+    model: "gemini-2.0-flash-exp",
+    credentialRefs: ["GOOGLE_API_KEY"],
+  },
+  openai: {
+    displayName: "OpenAI (GPT-4 Vision)",
+    baseURL: "https://api.openai.com/v1",
+    model: "gpt-4o",
+    credentialRefs: ["OPENAI_API_KEY"],
+  },
 } as const satisfies Record<string, VisionProviderSpec>
 
-export type VisionProviderName = keyof typeof VISION_PROVIDERS
+export type VisionProviderName = keyof typeof VISION_PROVIDERS | "custom"
 
 export function isVisionProviderName(value: unknown): value is VisionProviderName {
-  return typeof value === "string" && value in VISION_PROVIDERS
+  return typeof value === "string" && (value in VISION_PROVIDERS || value === "custom")
 }
 
 export function allVisionCredentialRefs(): string[] {

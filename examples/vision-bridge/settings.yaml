@@ -1,0 +1,51 @@
+# Vision Bridge — settings.yaml Snippets
+
+## Minimal setup (OpenRouter)
+```yaml
+llm-deepseek:
+  visionBackend: openrouter
+```
+
+## Full explicit configuration
+```yaml
+llm-deepseek:
+  visionBackend: openrouter
+  visionBackendModel: qwen/qwen3.7-plus
+  visionBackendBaseURL: https://openrouter.ai/api/v1
+  visionTimeoutMs: 120000
+  maxImages: 4
+  cacheEntries: 32
+```
+
+## Pinning to a Harness model route
+```yaml
+llm-deepseek:
+  visionProvider: anthropic
+  visionModel: claude-sonnet-4-20250514
+```
+
+> **Note:** `visionProvider` and `visionModel` must be set together.
+
+## see-skill compatible (auto-detected)
+```yaml
+# No settings.yaml changes needed — just ensure ~/.config/see/config.env exists:
+# SEE_PROVIDER=openrouter
+# OPENROUTER_API_KEY=sk-or-v1-...
+```
+
+## Multi-provider fallback
+```yaml
+llm-deepseek:
+  presetVisionProviders:
+    - openai
+    - anthropic
+    - openrouter
+```
+
+## Custom gateway
+```yaml
+llm-deepseek:
+  visionBackend: openai
+  visionBackendBaseURL: https://gateway.example.com/v1
+  visionBackendModel: custom-vision-model
+```

@@ -1,7 +1,7 @@
 {
-  "name": "@oil-oil/dsh-vision",
-  "version": "0.1.2",
-  "description": "Near-native image understanding for text-only DeepSeek Harness models",
+  "name": "@narger18/dsh-vision",
+  "version": "0.2.1",
+  "description": "Universal vision bridge and media generation for DeepSeek Harness - supports any provider, custom vision models, image and video generation",
   "license": "MIT",
   "type": "module",
   "main": "./lib/index.js",
@@ -27,18 +27,21 @@
   "sideEffects": false,
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/oil-oil/dsh-vision.git"
+    "url": "git+https://github.com/narger18/dsh-vision.git"
   },
-  "homepage": "https://github.com/oil-oil/dsh-vision#readme",
+  "homepage": "https://github.com/narger18/dsh-vision#readme",
   "bugs": {
-    "url": "https://github.com/oil-oil/dsh-vision/issues"
+    "url": "https://github.com/narger18/dsh-vision/issues"
   },
   "keywords": [
     "deepseek-harness",
     "dsh-plugin",
     "vision",
     "multimodal",
-    "image-understanding"
+    "image-understanding",
+    "image-generation",
+    "video-generation",
+    "custom-providers"
   ],
   "publishConfig": {
     "access": "public"
@@ -57,7 +60,8 @@
         "@deepseek-ai/dsh-client-locale",
         "@deepseek-ai/dsh-client-runtime",
         "@deepseek-ai/dsh-client-ui-settings",
-        "@deepseek-ai/dsh-client-ui-settings-plugins"
+        "@deepseek-ai/dsh-client-ui-settings-plugins",
+        "@deepseek-ai/dsh-client-ui-slots"
       ],
       "platform": "web"
     }

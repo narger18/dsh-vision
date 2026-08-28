@@ -79,7 +79,7 @@ async function callProvider(
     "Content-Type": "application/json",
   }
   if (provider.name === "openrouter") {
-    headers["HTTP-Referer"] = "https://github.com/oil-oil/dsh-vision"
+    headers["HTTP-Referer"] = "https://github.com/narger18/dsh-vision"
     headers["X-Title"] = "dsh-vision"
   }
   const response = await fetch(
